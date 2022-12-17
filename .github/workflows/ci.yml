@@ -36,10 +36,10 @@ jobs:
       with:
         dotnet-version: 7.0.x
     - name: Docker build
-      run: docker build --tag aa:1 ./src/SomeAppWeb/
+      run: docker build --tag someappweb:owaspzap ./src/SomeAppWeb/
     - name: Docker run
       run: |
-        docker run --pull never --publish 80:80 aa:1 &
+        docker run --pull never --publish 80:80 someappweb:owaspzap &
         sleep 5
     - name: OWASP ZAP Full Scan
       # You may pin to the exact commit or the version.
@@ -61,4 +61,4 @@ jobs:
         # The action status will be set to fail if ZAP identifies any alerts during the full scan
         #fail_action: # optional
         # Whether Github issues should be created or not
-        allow_issue_writing: true # optional, default is true
+        #allow_issue_writing: # optional, default is true
