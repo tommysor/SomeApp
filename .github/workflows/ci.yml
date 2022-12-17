@@ -61,4 +61,4 @@ jobs:
         # The action status will be set to fail if ZAP identifies any alerts during the full scan
         #fail_action: # optional
         # Whether Github issues should be created or not
-        allow_issue_writing: false # optional, default is true
+        allow_issue_writing: true # optional, default is true
