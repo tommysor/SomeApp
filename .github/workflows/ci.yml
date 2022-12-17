@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+    - name: Run
+      run: dotnet run
+    - name: OWASP ZAP Full Scan
+      # You may pin to the exact commit or the version.
+      # uses: zaproxy/action-full-scan@6eade0f93b10fad8cfb4e63b979703a2cbd0cc98
+      uses: zaproxy/action-full-scan@v0.4.0
+      with:
+        # GitHub Token to create issues in the repository
+        #token: # optional, default is ${{ github.token }}
+        # Target URL
+        target: http://localhost:5170
+        # Relative path of the ZAP configuration file
+        #rules_file_name: # optional
+        # The Docker file to be executed
+        #docker_name: # default is owasp/zap2docker-stable
+        # Additional command line options
+        #cmd_options: # optional
+        # The title for the GitHub issue to be created
+        #issue_title: # optional, default is ZAP Full Scan Report
+        # The action status will be set to fail if ZAP identifies any alerts during the full scan
+        #fail_action: # optional
+        # Whether Github issues should be created or not
+        #allow_issue_writing: # optional, default is true
