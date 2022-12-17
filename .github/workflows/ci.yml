@@ -23,3 +23,18 @@ jobs:
       run: dotnet build src/ --no-restore
     - name: Test
       run: dotnet test src/ --no-build --verbosity normal
+    
+    - name: Build container
+      run: docker build --tag someappweb:${{ github.run_number }} src/SomeAppWeb/
+
+  testInContainer:
+    runs-on: ubuntu-22.04
+    needs: build
+
+    services:
+      someappweb:
+        image: someappweb:${{ github.run_number }}
+    
+    steps:
+    - name: Curl
+      run: curl http://localhost/
