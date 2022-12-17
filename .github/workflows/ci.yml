@@ -36,4 +36,6 @@ jobs:
     - name: Run container
       run: docker run --pull never someappweb:${{ github.run_number }} &
     - name: Curl
-      run: curl http://localhost/
+      run: |
+        sleep 10
+        curl http://localhost/
