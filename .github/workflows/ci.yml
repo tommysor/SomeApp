@@ -7,12 +7,12 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+#  build:
 
-    runs-on: ubuntu-22.04
+#    runs-on: ubuntu-22.04
 
-    steps:
-    - uses: actions/checkout@v3
+#    steps:
+#    - uses: actions/checkout@v3
 #    - name: Setup .NET
 #      uses: actions/setup-dotnet@v3
 #      with:
@@ -26,13 +26,14 @@ jobs:
 
   testInContainer:
     runs-on: ubuntu-22.04
-    needs: build
+#    needs: build
+    timeout-minutes: 30
     
     steps:
     - uses: actions/checkout@v3
     - name: Build container
       run: docker build --tag someappweb:${{ github.run_number }} src/SomeAppWeb/
     - name: Run container
-      run: docker run --pull never someappweb:${{ github.run_number }}
+      run: docker run --pull never someappweb:${{ github.run_number }} &
     - name: Curl
       run: curl http://localhost/
