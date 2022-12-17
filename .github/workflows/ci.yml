@@ -20,13 +20,13 @@ jobs:
     - name: Set Working directory
       run: cd src
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore src/
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build src/ --no-restore
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test src/ --no-build --verbosity normal
     - name: Run
-      run: dotnet run
+      run: dotnet run src/
     - name: OWASP ZAP Full Scan
       # You may pin to the exact commit or the version.
       # uses: zaproxy/action-full-scan@6eade0f93b10fad8cfb4e63b979703a2cbd0cc98
