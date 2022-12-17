@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v3
@@ -22,3 +23,12 @@ jobs:
       run: dotnet build src/ --no-restore
     - name: Test
       run: dotnet test src/ --no-build --verbosity normal
+    
+    - name: Docker build
+      run: docker build --tag aa:1 .
+    - name: Docker run
+      run: docker run --pull never --publish 80:80 aa:1 &
+    - name: Live test
+      run: |
+        sleep 5
+        curl http://localhost/
