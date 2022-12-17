@@ -25,7 +25,7 @@ jobs:
       run: dotnet test src/ --no-build --verbosity normal
     
     - name: Docker build
-      run: docker build --tag aa:1 .
+      run: docker build --tag aa:1 ./src/SomeAppWeb/
     - name: Docker run
       run: docker run --pull never --publish 80:80 aa:1 &
     - name: Live test
