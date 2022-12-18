@@ -1,3 +1,6 @@
+using Microsoft.Azure.ServiceBus;
+using Microsoft.Azure.ServiceBus.Core;
+
 namespace SomeAppWeb;
 
 public class Program
@@ -8,6 +11,28 @@ public class Program
 
         // Add services to the container.
         builder.Services.AddRazorPages();
+
+        builder.Services.AddSingleton<Services.IGetSomeTextQueueHandler, Services.GetSomeTextQueueHandler>();
+
+        builder.Services.AddSingleton<IReceiverClient, QueueClient>(services =>
+        {
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var connectionString = configuration["Queues:ReceiveReplyQueue:ConnectionString"];
+            var queueName = configuration["Queues:ReceiveReplyQueue:Name"];
+
+            var client = new QueueClient(connectionString, queueName, ReceiveMode.PeekLock, RetryPolicy.Default);
+            return client;
+        });
+
+        builder.Services.AddSingleton<ISenderClient, QueueClient>(services =>
+        {
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var connectionString = configuration["Queues:SendRequestQueue:ConnectionString"];
+            var queueName = configuration["Queues:SendRequestQueue:Name"];
+
+            var client = new QueueClient(connectionString, queueName, ReceiveMode.PeekLock, RetryPolicy.Default);
+            return client;
+        });
 
         var app = builder.Build();
 
