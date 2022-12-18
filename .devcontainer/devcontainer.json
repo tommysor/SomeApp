@@ -4,7 +4,8 @@
 	"name": "SomeApp",
 	"image": "mcr.microsoft.com/devcontainers/dotnet:0-7.0",
 	"features": {
-		"ghcr.io/dhoeric/features/act:1": {}
+		"ghcr.io/dhoeric/features/act:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {}
 	},
 	"customizations": {
 		"vscode": {
