@@ -6,5 +6,30 @@
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <button type="button" onclick="UpdateText()">Update Text</button>
+
+    <script>
+        function UpdateText() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("text").innerText = this.responseText;
+                }
+            };
+            xhttp.open("GET", "/index?handler=UpdateText", true);
+            xhttp.send();
+        }
+    </script>
+
+</div>
+
+
+
+<!-- area to display some text -->
+<div class="row">
+    <div class="col-md-6">
+        <p id="text">
+            
+        </p>
+    </div>
 </div>
