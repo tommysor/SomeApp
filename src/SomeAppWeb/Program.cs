@@ -1,5 +1,7 @@
-using Microsoft.Azure.ServiceBus;
-using Microsoft.Azure.ServiceBus.Core;
+using Microsoft.Extensions.Azure;
+using Azure.Storage;
+using Azure.Storage.Queues;
+using Azure.Identity;
 
 namespace SomeAppWeb;
 
@@ -13,26 +15,6 @@ public class Program
         builder.Services.AddRazorPages();
 
         builder.Services.AddSingleton<Services.IGetSomeTextQueueHandler, Services.GetSomeTextQueueHandler>();
-
-        builder.Services.AddSingleton<IReceiverClient, QueueClient>(services =>
-        {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var connectionString = configuration["Queues:ReceiveReplyQueue:ConnectionString"];
-            var queueName = configuration["Queues:ReceiveReplyQueue:Name"];
-
-            var client = new QueueClient(connectionString, queueName, ReceiveMode.PeekLock, RetryPolicy.Default);
-            return client;
-        });
-
-        builder.Services.AddSingleton<ISenderClient, QueueClient>(services =>
-        {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var connectionString = configuration["Queues:SendRequestQueue:ConnectionString"];
-            var queueName = configuration["Queues:SendRequestQueue:Name"];
-
-            var client = new QueueClient(connectionString, queueName, ReceiveMode.PeekLock, RetryPolicy.Default);
-            return client;
-        });
 
         var app = builder.Build();
 
