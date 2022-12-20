@@ -142,9 +142,9 @@ namespace SomeAppWeb.Services
                 return text!;
             }
 
-            for (var i = 0; i < 100; i++)
+            for (var i = 0; i < 400; i++)
             {
-                await Task.Delay(100);
+                await Task.Delay(10);
 
                 if (_cache.TryGetValue<string>(requestId, out text))
                 {
@@ -167,7 +167,7 @@ namespace SomeAppWeb.Services
             var requestMessageJson = JsonSerializer.Serialize(requestMessage);
             await _requestClient.SendMessageAsync(requestMessageJson);
             
-            _logger.LogInformation("Sent message to queue: {requestId}", requestId);
+            _logger.LogInformation("Sent message to queue: {QueueName} with requestId: {requestId}", _requestClient.Name, requestId);
             return requestId;
         }
 

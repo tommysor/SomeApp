@@ -16,35 +16,53 @@ public class IndexTests : IClassFixture<SystemDependenciesFixture>
     private readonly HttpClient _sutClient;
     private readonly WebApplicationFactory<SomeApiMock.IAssemblyMarker> _someApiMock;
     private readonly HttpClient _someApiMockClient;
+    private readonly string _requestQueueName;
+    private readonly string _replyQueueName;
 
     public IndexTests(SystemDependenciesFixture systemDependenciesFixture)
     {
         _systemDependenciesFixture = systemDependenciesFixture;
 
-        var queuePrefix = Guid.NewGuid();
-        _host = CreateHostWithFakes(queuePrefix);
+        var queuePostfix = Guid.NewGuid();
+        _requestQueueName = $"request-{queuePostfix}";
+        _replyQueueName = $"reply-{queuePostfix}";
+        _host = CreateHostWithFakes();
         _sutClient = _host.CreateClient();
-        _someApiMock = CreateSomeApiMock(queuePrefix);
+        _someApiMock = CreateSomeApiMock();
         _someApiMockClient = _someApiMock.CreateClient();
     }
 
-    private WebApplicationFactory<IAssemblyMarker> CreateHostWithFakes(Guid queuePrefix)
+    private void OverrideConfig(IWebHostBuilder builder)
+    {
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            IEnumerable<KeyValuePair<string, string?>>? configValues = new []
+            {
+                new KeyValuePair<string, string?>("AzureStorageQueues:Request:Name", _requestQueueName),
+                new KeyValuePair<string, string?>("AzureStorageQueues:Reply:Name", _replyQueueName),
+            };
+            config.AddInMemoryCollection(configValues);
+        });
+    }
+
+    private WebApplicationFactory<IAssemblyMarker> CreateHostWithFakes()
     {
         return new WebApplicationFactory<IAssemblyMarker>()
             .WithWebHostBuilder(builder =>
             {
-
+                OverrideConfig(builder);
                 builder.ConfigureServices(services =>
                 {
                 });
             });
     }
 
-    private WebApplicationFactory<SomeApiMock.IAssemblyMarker> CreateSomeApiMock(Guid queuePrefix)
+    private WebApplicationFactory<SomeApiMock.IAssemblyMarker> CreateSomeApiMock()
     {
         return new WebApplicationFactory<SomeApiMock.IAssemblyMarker>()
             .WithWebHostBuilder(builder =>
             {
+                OverrideConfig(builder);
                 builder.ConfigureServices(services =>
                 {
                 });
@@ -74,38 +92,28 @@ public class IndexTests : IClassFixture<SystemDependenciesFixture>
         Assert.Equal(Faketext, actualText);
     }
 
-    // [Fact]
-    // public async Task GetUpdateText_WhenSendFails_ShouldThrow()
-    // {
-    //     var host = CreateHostWithFakes(x => x.SendShouldFail = true);
-    //     var client = host.CreateClient();
-    //     var actual = await client.GetAsync(updateActionPath);
-    //     Assert.False(actual.IsSuccessStatusCode);
-    //     var contentActual = await actual.Content.ReadAsStringAsync();
-    //     Assert.Contains("InvalidOperationException", contentActual);
-    // }
-
-    // [Theory]
-    // [InlineData(null, true, Faketext)]
-    // [InlineData("", false, Faketext)]
-    // [InlineData(" ", false, Faketext)]
-    // [InlineData("\t", false, Faketext)]
-    // [InlineData(null, false, null)]
-    // [InlineData(null, false, "")]
-    // [InlineData(null, false, " ")]
-    // [InlineData(null, false, "\t")]
-    // public async Task GetUpdateText_WhenReceiveFails_ShouldThrow(string? id, bool idNull, string? text)
-    // {
-    //     var host = CreateHostWithFakes(x => 
-    //     {
-    //         x.RequestId = id;
-    //         x.RequestIdNull = idNull;
-    //         x.ResponseText = text;
-    //     });
-    //     var client = host.CreateClient();
-    //     var actual = await client.GetAsync(updateActionPath);
-    //     Assert.False(actual.IsSuccessStatusCode);
-    //     var contentActual = await actual.Content.ReadAsStringAsync();
-    //     Assert.Contains("TimeoutException", contentActual);
-    // }
+    [Theory]
+    [InlineData("", null)]
+    [InlineData(" ", null)]
+    [InlineData("\t", null)]
+    [InlineData(null, "")]
+    [InlineData(null, " ")]
+    [InlineData(null, "\t")]
+    public async Task GetUpdateText_WhenReceiveFails_ShouldThrow(string? id, string? text)
+    {
+        var mockObject = new
+        {
+            QueueName = _requestQueueName,
+            ReturnThisRequestId = id,
+            ReturnThisText = text,
+        };
+        await _someApiMockClient.PostAsync(
+            "/mock",
+            new StringContent(JsonSerializer.Serialize(mockObject), Encoding.UTF8, "application/json"));
+        
+        var actual = await _sutClient.GetAsync(updateActionPath);
+        Assert.False(actual.IsSuccessStatusCode);
+        var contentActual = await actual.Content.ReadAsStringAsync();
+        Assert.Contains("TimeoutException", contentActual);
+    }
 }

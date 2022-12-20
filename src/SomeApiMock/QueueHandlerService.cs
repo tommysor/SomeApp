@@ -16,7 +16,7 @@ public sealed class QueueHandlerService : IHostedService
     private CancellationTokenSource _cancellationTokenSource = new();
     private Task _task = Task.FromException(new Exception("Task not started yet"));
 
-    public QueueHandlerService(ILogger<QueueHandlerService> logger, IMemoryCache cache)
+    public QueueHandlerService(ILogger<QueueHandlerService> logger, IMemoryCache cache, IConfiguration configuration)
     {
         _logger = logger;
         _cache = cache;
@@ -30,12 +30,12 @@ public sealed class QueueHandlerService : IHostedService
 
         _requestClient = new QueueClient(
             "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
-            "gettextrequest");
+            configuration["AzureStorageQueues:Request:Name"]);
         _requestClient.CreateIfNotExists();
 
         _replyClient = new QueueClient(
             "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
-            "gettextreply");
+            configuration["AzureStorageQueues:Reply:Name"]);
         _replyClient.CreateIfNotExists();
     }
 
@@ -65,7 +65,7 @@ public sealed class QueueHandlerService : IHostedService
                 var message = await _requestClient.ReceiveMessageAsync();
                 if (message?.Value == null)
                 {
-                    await Task.Delay(100, _cancellationTokenSource.Token);
+                    await Task.Delay(10, _cancellationTokenSource.Token);
                     continue;
                 }
 
@@ -86,12 +86,24 @@ public sealed class QueueHandlerService : IHostedService
         var obj = JsonSerializer.Deserialize<RequestObject>(text);
         var requestId = obj!.RequestId;
 
-        //todo check if requested special handling
+        var requestIdCacheKey = $"{_requestClient.Name}-RequestId";
+        if (_cache.TryGetValue(requestIdCacheKey, out string? cachedRequestId))
+        {
+            requestId = cachedRequestId;
+        }
+
+        var replyText = "Faketext";
+
+        var textCacheKey = $"{_requestClient.Name}-Text";
+        if (_cache.TryGetValue(textCacheKey, out string? cachedText))
+        {
+            replyText = cachedText;
+        }
 
         var responseObj = new 
         {
             RequestId = requestId,
-            Text = "Faketext"
+            Text = replyText
         };
         
         var responseText = JsonSerializer.Serialize(responseObj);
