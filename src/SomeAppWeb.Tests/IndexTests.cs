@@ -92,6 +92,28 @@ public class IndexTests : IClassFixture<SystemDependenciesFixture>
         Assert.Equal(Faketext, actualText);
     }
 
+    [Fact]
+    public async Task GetUpdateText_Many_Succeeds()
+    {
+        var tasks = new List<Task>();
+        for (var i = 0; i < 50; i++)
+        {
+            var task = Task.Run(async () =>
+            {
+                var client = _host.CreateClient();
+                var actual = await client.GetAsync(updateActionPath);
+                var actualText = await actual.Content.ReadAsStringAsync();
+                Assert.Equal(System.Net.HttpStatusCode.OK, actual.StatusCode);
+                Assert.Equal(Faketext, actualText);
+            });
+
+            tasks.Add(task);
+        }
+        
+        await Task.WhenAll(tasks);
+        Assert.True(true);
+    }
+
     [Theory]
     [InlineData("", null)]
     [InlineData(" ", null)]
