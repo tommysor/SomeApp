@@ -11,13 +11,13 @@ namespace SomeAppWeb.Services
     {
         private readonly ILogger<GetSomeTextQueueHandler> _logger;
         private readonly IMemoryCache _cache;
-        private readonly QueueClient _senderClient;
-        private readonly QueueClient _receiverClient;
-        private readonly QueueClient _receiverDeadletterClient;
-        private Task _receiverTask = Task.CompletedTask;
-        private CancellationTokenSource _receiverCancellationTokenSource = new();
+        private readonly QueueClient _requestClient;
+        private readonly QueueClient _replyClient;
+        private readonly QueueClient _replyDeadletterClient;
+        private Task _replyReaderTask = Task.CompletedTask;
+        private readonly CancellationTokenSource _replyReaderCancellationTokenSource = new();
 
-        public GetSomeTextQueueHandler(ILogger<GetSomeTextQueueHandler> logger, IMemoryCache cache)
+        public GetSomeTextQueueHandler(ILogger<GetSomeTextQueueHandler> logger, IMemoryCache cache, IConfiguration configuration)
         {
             _logger = logger;
             _cache = cache;
@@ -30,35 +30,30 @@ namespace SomeAppWeb.Services
             options.Retry.Mode = Azure.Core.RetryMode.Exponential;
             options.Retry.NetworkTimeout = TimeSpan.FromSeconds(2);
 
-            _senderClient = new QueueClient(
-                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
-                "someappsend");
-            _senderClient.CreateIfNotExists();
+            var connectionString = configuration["AzureStorageQueues:ConnectionString"];
 
-            _receiverClient = new QueueClient(
-                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
-                "someappreceive");
-            _receiverClient.CreateIfNotExists();
+            _requestClient = new QueueClient(
+                connectionString,
+                configuration["AzureStorageQueues:Request:Name"]);
+            _requestClient.CreateIfNotExists();
 
-            _receiverDeadletterClient = new QueueClient(
-                "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;",
-                "someappreceivedeadletter");
-            _receiverDeadletterClient.CreateIfNotExists();
+            _replyClient = new QueueClient(
+                connectionString,
+                configuration["AzureStorageQueues:Reply:Name"]);
+            _replyClient.CreateIfNotExists();
+
+            _replyDeadletterClient = new QueueClient(
+                connectionString,
+                configuration["AzureStorageQueues:ReplyDeadletter:Name"]);
+            _replyDeadletterClient.CreateIfNotExists();
+
+            _replyReaderTask = ReceiveMessagesAsync(_replyReaderCancellationTokenSource.Token);
         }
 
         public void Dispose()
         {
-            _receiverCancellationTokenSource?.Cancel();
+            _replyReaderCancellationTokenSource.Cancel();
             GC.SuppressFinalize(this);
-        }
-
-        private void StartReceiveTaskIfNotRunning()
-        {
-            if (_receiverTask.IsCompleted)
-            {
-                _receiverCancellationTokenSource = new();
-                _receiverTask = ReceiveMessagesAsync(_receiverCancellationTokenSource.Token);
-            }
         }
 
         private async Task ReceiveMessagesAsync(CancellationToken cancellationToken)
@@ -67,21 +62,19 @@ namespace SomeAppWeb.Services
             {
                 try
                 {
-                    var message = await _receiverClient.ReceiveMessageAsync(TimeSpan.FromSeconds(2));
-                    if (message == null)
+                    var message = await _replyClient.ReceiveMessageAsync(TimeSpan.FromSeconds(2));
+                    if (message?.Value == null)
                     {
-                        _logger.LogInformation("No messages in queue");
-                        await Task.Delay(500, cancellationToken);
+                        await Task.Delay(100, cancellationToken);
                         continue;
                     }
 
                     if (message.Value.DequeueCount > 3)
                     {
-                        // log warning and move to _receiverDeadletterClient
                         _logger.LogWarning("Message id: {MessageId}. This is the {DequeueCount} this message is seen. Moving to deadletter queue",
                             message.Value.MessageId, message.Value.DequeueCount);
-                        await _receiverDeadletterClient.SendMessageAsync(message.Value.Body);
-                        await _receiverClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt);
+                        await _replyDeadletterClient.SendMessageAsync(message.Value.Body);
+                        await _replyClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt);
                         continue;
                     }
 
@@ -110,7 +103,7 @@ namespace SomeAppWeb.Services
             
             _cache.Set(messageObject.RequestId!, messageObject.Text, TimeSpan.FromSeconds(12));
             
-            await _receiverClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
+            await _replyClient.DeleteMessageAsync(message.MessageId, message.PopReceipt);
         }
 
         private ResponseObject? DeserializeAndValidate(QueueMessage message)
@@ -172,7 +165,7 @@ namespace SomeAppWeb.Services
             };
             
             var requestMessageJson = JsonSerializer.Serialize(requestMessage);
-            await _senderClient.SendMessageAsync(requestMessageJson);
+            await _requestClient.SendMessageAsync(requestMessageJson);
             
             _logger.LogInformation("Sent message to queue: {requestId}", requestId);
             return requestId;
